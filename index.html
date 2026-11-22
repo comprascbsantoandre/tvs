@@ -73,6 +73,7 @@
 <div id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="ffmpeg.js"></script>
 <script>
 (function () {
   var CFG = window.CONFIG;
@@ -197,14 +198,71 @@
       v.src = u;
     });
   }
+  // ---------- compressão no navegador ----------
+  var ffPromise = null;
+  var ffProgresso = null;
+  var LIMITE_COMPRIMIR = 12 * 1024 * 1024; // vídeos acima disso são comprimidos
+  var CORE_BASE = CFG.CORE_BASE || 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+  function blobUrl(url, tipo) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('Falha ao baixar ' + url); return r.blob(); })
+      .then(function (b) { return URL.createObjectURL(new Blob([b], { type: tipo })); });
+  }
+  function getFF(status) {
+    if (ffPromise) return ffPromise;
+    ffPromise = (async function () {
+      if (!window.FFmpegWASM) throw new Error('Compressor não carregou.');
+      status('Preparando o compressor (só na primeira vez, ~30 MB)...');
+      var ff = new window.FFmpegWASM.FFmpeg();
+      ff.on('progress', function (p) { if (ffProgresso) ffProgresso(p.progress); });
+      await ff.load({
+        coreURL: await blobUrl(CORE_BASE + '/ffmpeg-core.js', 'text/javascript'),
+        wasmURL: await blobUrl(CORE_BASE + '/ffmpeg-core.wasm', 'application/wasm')
+      });
+      return ff;
+    })();
+    ffPromise.catch(function () { ffPromise = null; });
+    return ffPromise;
+  }
+  async function comprimirVideo(file, status, rotulo) {
+    var ff = await getFF(status);
+    var t0 = Date.now();
+    ffProgresso = function (p) {
+      var pc = Math.max(0, Math.min(99, Math.round(p * 100)));
+      status(rotulo + ' — comprimindo ' + pc + '%');
+    };
+    status(rotulo + ' — comprimindo 0%');
+    await ff.writeFile('in.mp4', new Uint8Array(await file.arrayBuffer()));
+    var rc = await ff.exec(['-i', 'in.mp4', '-vf', 'scale=min(1920\\,iw):-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25',
+      '-maxrate', '4M', '-bufsize', '8M', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', 'out.mp4']);
+    ffProgresso = null;
+    if (rc !== 0) { try { await ff.deleteFile('in.mp4'); } catch (e) {} throw new Error('Não foi possível comprimir este vídeo.'); }
+    var dados = await ff.readFile('out.mp4');
+    try { await ff.deleteFile('in.mp4'); await ff.deleteFile('out.mp4'); } catch (e) {}
+    var out = new File([dados.buffer], file.name.replace(/\.[^.]+$/, '') + '.mp4', { type: 'video/mp4' });
+    out.segundos = Math.round((Date.now() - t0) / 1000);
+    return out;
+  }
+  window.comprimirVideo = comprimirVideo;
+
   async function enviar(files, campId, status) {
     var itens = [];
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
+      var rotulo = 'Arquivo ' + (i + 1) + ' de ' + files.length + ' (' + f.name + ')';
       var tipo = f.type.indexOf('video') === 0 ? 'video' : (f.type.indexOf('image') === 0 ? 'imagem' : null);
       if (!tipo) throw new Error('"' + f.name + '" não é vídeo nem imagem.');
-      if (f.size > MAX_MB * 1024 * 1024) throw new Error('"' + f.name + '" tem ' + Math.round(f.size / 1048576) + ' MB. O limite é ' + MAX_MB + ' MB: comprima o vídeo antes (HandBrake).');
-      status('Enviando ' + (i + 1) + ' de ' + files.length + ': ' + f.name + '...');
+      var original = f;
+      if (tipo === 'video' && f.size > LIMITE_COMPRIMIR) {
+        try {
+          f = await comprimirVideo(f, status, rotulo);
+          if (f.size >= original.size && original.size <= MAX_MB * 1048576) f = original;
+        } catch (e) {
+          if (original.size > MAX_MB * 1048576) throw new Error('"' + original.name + '" tem ' + Math.round(original.size / 1048576) + ' MB e não foi possível comprimir: ' + e.message);
+          f = original;
+        }
+      }
+      if (f.size > MAX_MB * 1048576) throw new Error('"' + f.name + '" continua com ' + Math.round(f.size / 1048576) + ' MB depois de comprimir. O limite é ' + MAX_MB + ' MB.');
+      status(rotulo + ' — enviando' + (f !== original ? ' (' + Math.round(original.size / 1048576) + ' MB → ' + (f.size / 1048576).toFixed(1) + ' MB)' : '') + '...');
       var dur = tipo === 'video' ? await lerDuracao(f) : 10;
       var path = campId + '/' + Date.now() + '-' + i + '-' + nomeSeguro(f.name);
       var up = await sb.storage.from(CFG.BUCKET).upload(path, f, { contentType: f.type, upsert: false });
@@ -235,7 +293,7 @@
     }));
     main.appendChild(h('div', { class: 'card' },
       h('h2', null, 'Nova campanha'), nome, arq,
-      h('div', { class: 'mini', style: 'margin-top:6px' }, 'Vídeos até ' + MAX_MB + ' MB, de preferência já comprimidos (1920x1080, sem áudio). Imagens passam 10 s por padrão.'),
+      h('div', { class: 'mini', style: 'margin-top:6px' }, 'Vídeos grandes são comprimidos automaticamente antes do envio (pode levar alguns minutos). Imagens passam 10 s por padrão.'),
       btn, prog));
 
     if (!S.campanhas.length) main.appendChild(h('div', { class: 'vazio' }, 'Nenhuma campanha ainda.'));
