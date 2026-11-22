@@ -182,6 +182,18 @@
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) travaTela(); });
 
+  // ---------- tela cheia (precisa de um OK/clique no controle remoto) ----------
+  function telaCheia() {
+    var d = document.documentElement;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      var f = d.requestFullscreen || d.webkitRequestFullscreen || d.mozRequestFullScreen || d.msRequestFullscreen;
+      if (f) { var p = f.call(d); if (p && p.catch) p.catch(function () {}); }
+    } catch (e) {}
+  }
+  document.addEventListener('click', telaCheia);
+  document.addEventListener('keydown', telaCheia);
+
   // ---------- início ----------
   if (!tvId) {
     mostrarAviso('TV não identificada', 'Abra o link no formato tv.html?tv=eventos-1-a');
