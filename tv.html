@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>TV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; cursor:none; }
+  .camada { position:absolute; left:0; top:0; width:100%; height:100%; background:#000; opacity:0; transition:opacity .8s; }
+  .camada.on { opacity:1; }
+  .camada img, .camada video { width:100%; height:100%; object-fit:contain; display:block; background:#000; }
+  #aviso { position:absolute; left:0; top:0; width:100%; height:100%; display:none; color:#d9a84e; font-family:Arial,sans-serif; text-align:center; background:#1b0e0f; }
+  #aviso div { position:absolute; top:50%; left:0; width:100%; margin-top:-40px; font-size:28px; line-height:1.5; }
+  #aviso small { color:#8a6a5a; font-size:18px; }
+</style>
+</head>
+<body>
+<div class="camada" id="c0"></div>
+<div class="camada" id="c1"></div>
+<div id="aviso"><div id="avisoTxt"></div></div>
+<script src="config.js"></script>
+<script>
+(function () {
+  var CFG = window.CONFIG;
+  var tvId = null;
+  var m = /[?&]tv=([a-z0-9-]+)/.exec(location.search) || /#tv-([a-z0-9-]+)/.exec(location.hash);
+  if (m) tvId = m[1];
+
+  var aviso = document.getElementById('aviso');
+  var avisoTxt = document.getElementById('avisoTxt');
+  var camadas = [document.getElementById('c0'), document.getElementById('c1')];
+  var frente = 0;            // índice da camada visível
+  var lista = [];            // playlist atual
+  var assinatura = '';       // JSON da playlist para detectar mudanças
+  var pos = -1;              // posição atual
+  var timer = null;
+  var geracao = 0;           // invalida callbacks antigos
+  var tocandoAgora = '';
+
+  function mostrarAviso(t, sub) {
+    avisoTxt.innerHTML = t + (sub ? '<br><small>' + sub + '</small>' : '');
+    aviso.style.display = 'block';
+  }
+  function esconderAviso() { aviso.style.display = 'none'; }
+
+  function url(path) {
+    var partes = String(path).split('/');
+    for (var i = 0; i < partes.length; i++) partes[i] = encodeURIComponent(partes[i]);
+    return CFG.URL + '/storage/v1/object/public/' + CFG.BUCKET + '/' + partes.join('/');
+  }
+
+  function rpc(nome, corpo, ok, falha) {
+    var x = new XMLHttpRequest();
+    x.open('POST', CFG.URL + '/rest/v1/rpc/' + nome, true);
+    x.setRequestHeader('apikey', CFG.KEY);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.timeout = 20000;
+    x.onload = function () {
+      if (x.status >= 200 && x.status < 300) {
+        var d = null;
+        try { d = x.responseText ? JSON.parse(x.responseText) : null; } catch (e) {}
+        if (ok) ok(d);
+      } else if (falha) falha();
+    };
+    x.onerror = function () { if (falha) falha(); };
+    x.ontimeout = function () { if (falha) falha(); };
+    x.send(JSON.stringify(corpo));
+  }
+
+  // ---------- reprodução ----------
+  function limpaTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+
+  function proximo() {
+    if (!lista.length) { mostrarVazio(); return; }
+    pos = (pos + 1) % lista.length;
+    tocar(pos);
+  }
+
+  function mostrarVazio() {
+    geracao++;
+    limpaTimer();
+    camadas[0].className = 'camada';
+    camadas[1].className = 'camada';
+    camadas[0].innerHTML = ''; camadas[1].innerHTML = '';
+    mostrarAviso('Sem campanha para esta TV', tvId ? tvId : 'TV não identificada');
+    tocandoAgora = '';
+  }
+
+  function tocar(i) {
+    limpaTimer();
+    var meu = ++geracao;
+    var item = lista[i];
+    if (!item) { proximo(); return; }
+    var atras = 1 - frente;
+    var cam = camadas[atras];
+    cam.innerHTML = '';
+    var el, pronto = false, seguiu = false;
+
+    function exibir() {
+      if (pronto || meu !== geracao) return;
+      pronto = true;
+      esconderAviso();
+      cam.className = 'camada on';
+      camadas[frente].className = 'camada';
+      var antiga = camadas[frente];
+      frente = atras;
+      setTimeout(function () { if (antiga !== camadas[frente]) antiga.innerHTML = ''; }, 1000);
+      tocandoAgora = item.campanha || '';
+      var dur = parseInt(item.dur, 10) || 10;
+      if (item.tipo === 'video') {
+        try { var p = el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+        if (lista.length === 1) { el.loop = true; return; }
+        timer = setTimeout(avancar, (dur + 6) * 1000); // segurança
+      } else {
+        if (lista.length === 1) return;
+        timer = setTimeout(avancar, dur * 1000);
+      }
+    }
+    function avancar() {
+      if (seguiu || meu !== geracao) return;
+      seguiu = true;
+      proximo();
+    }
+    function falhou() {
+      if (meu !== geracao) return;
+      timer = setTimeout(avancar, 2000);
+    }
+
+    if (item.tipo === 'video') {
+      el = document.createElement('video');
+      el.muted = true; el.defaultMuted = true;
+      el.setAttribute('muted', ''); el.setAttribute('playsinline', ''); el.setAttribute('webkit-playsinline', '');
+      el.preload = 'auto';
+      el.oncanplay = exibir;
+      el.onended = avancar;
+      el.onerror = falhou;
+      el.src = url(item.path);
+      cam.appendChild(el);
+      try { el.load(); } catch (e) {}
+      setTimeout(function () { if (!pronto && meu === geracao) { exibir(); } }, 15000);
+    } else {
+      el = document.createElement('img');
+      el.onload = exibir;
+      el.onerror = falhou;
+      el.src = url(item.path);
+      cam.appendChild(el);
+      setTimeout(function () { if (!pronto && meu === geracao) { falhou(); } }, 15000);
+    }
+  }
+
+  // ---------- atualização da playlist ----------
+  function aplicar(nova) {
+    var ass = JSON.stringify(nova);
+    if (ass === assinatura) return;
+    assinatura = ass;
+    try { localStorage.setItem('pl-' + tvId, ass); } catch (e) {}
+    lista = nova;
+    pos = -1;
+    if (!lista.length) { mostrarVazio(); return; }
+    proximo();
+  }
+
+  function buscar() {
+    if (!tvId) return;
+    rpc('playlist', { p_tv: tvId }, function (d) {
+      if (d && d.length !== undefined) aplicar(d);
+    }, function () { /* sem rede: mantém o que está tocando */ });
+  }
+
+  function batimento() {
+    if (!tvId) return;
+    rpc('bater', { p_tv: tvId, p_tocando: tocandoAgora }, null, null);
+  }
+
+  // ---------- tela sempre ligada ----------
+  function travaTela() {
+    try {
+      if (navigator.wakeLock && navigator.wakeLock.request) {
+        navigator.wakeLock.request('screen').catch(function () {});
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) travaTela(); });
+
+  // ---------- início ----------
+  if (!tvId) {
+    mostrarAviso('TV não identificada', 'Abra o link no formato tv.html?tv=eventos-1-a');
+    return;
+  }
+  // mostra a última playlist conhecida enquanto a rede responde
+  try {
+    var guardada = localStorage.getItem('pl-' + tvId);
+    if (guardada) { assinatura = guardada; lista = JSON.parse(guardada); if (lista.length) proximo(); }
+  } catch (e) {}
+  if (!lista.length) mostrarAviso('Carregando...', tvId);
+  travaTela();
+  buscar();
+  batimento();
+  setInterval(buscar, 60 * 1000);
+  setInterval(batimento, 2 * 60 * 1000);
+  // recarrega a página 1x por dia (limpa memória do navegador da TV)
+  setTimeout(function () { location.reload(); }, 24 * 60 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

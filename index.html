@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Painel de TVs · Coco Bambu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#1b0e0f; --card:#2a1618; --card2:#331b1e; --line:#4a2a2e; --gold:#d9a84e; --wine:#8c2634; --wine-deep:#4a1c24; --txt:#f3e7d8; --mut:#a58e80; --ok:#5fbf7a; --bad:#d2534f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:'Figtree',system-ui,sans-serif; font-size:15px; }
+  button { font-family:inherit; cursor:pointer; }
+  input { font-family:inherit; }
+  header { display:flex; align-items:center; gap:16px; padding:14px 22px; border-bottom:1px solid var(--line); background:var(--wine-deep); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:18px; margin:0; color:var(--gold); font-weight:700; letter-spacing:.3px; }
+  nav { display:flex; gap:6px; margin-left:18px; }
+  nav button { background:transparent; border:1px solid transparent; color:var(--mut); padding:7px 14px; border-radius:8px; font-weight:600; font-size:14px; }
+  nav button.on { background:var(--bg); color:var(--gold); border-color:var(--line); }
+  .sp { flex:1; }
+  .mini { font-size:13px; color:var(--mut); }
+  main { max-width:1000px; margin:0 auto; padding:22px; }
+  .btn { background:var(--wine); color:#fff; border:0; border-radius:8px; padding:9px 16px; font-weight:600; font-size:14px; }
+  .btn:hover { filter:brightness(1.15); }
+  .btn.sec { background:transparent; border:1px solid var(--line); color:var(--txt); }
+  .btn.gold { background:var(--gold); color:#2a1618; }
+  .btn.peq { padding:5px 10px; font-size:13px; }
+  .btn.perigo { background:transparent; border:1px solid #6b2a2e; color:#e08a85; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
+  .card h2 { margin:0 0 12px; font-size:16px; color:var(--gold); }
+  input[type=text], input[type=email], input[type=password], input[type=number] { background:var(--bg); border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:9px 11px; font-size:15px; width:100%; }
+  input:focus { outline:2px solid var(--gold); outline-offset:-1px; }
+  .linha { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .chip { border:1px solid var(--line); background:var(--bg); color:var(--mut); border-radius:20px; padding:6px 13px; font-size:13px; font-weight:600; }
+  .chip.on { background:var(--gold); color:#2a1618; border-color:var(--gold); }
+  .chip.parcial { border-color:var(--gold); color:var(--gold); }
+  .chip.todo { border-style:dashed; }
+  .item { display:flex; align-items:center; gap:12px; padding:8px; background:var(--card2); border-radius:8px; margin-bottom:8px; }
+  .item .th { width:84px; height:48px; border-radius:6px; background:#000; object-fit:cover; flex:none; }
+  .item .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+  .item .dur { width:64px; flex:none; padding:6px 8px; }
+  .onde { margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .onde .sala { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .onde .sala b { min-width:90px; font-size:13px; color:var(--mut); }
+  .badge { font-size:12px; padding:3px 9px; border-radius:12px; font-weight:700; }
+  .badge.on { background:#1f3a29; color:var(--ok); }
+  .badge.off { background:#3a2020; color:#e08a85; }
+  .nome-camp { font-size:17px; font-weight:700; background:transparent !important; border:1px solid transparent !important; padding:5px 8px !important; }
+  .nome-camp:hover, .nome-camp:focus { border-color:var(--line) !important; }
+  .sala-cab { display:flex; align-items:center; gap:10px; background:var(--wine-deep); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .sala-cab input { background:transparent; border:1px solid transparent; font-size:18px; font-weight:700; color:var(--gold); }
+  .sala-cab input:hover, .sala-cab input:focus { border-color:var(--line); }
+  .tv { display:flex; align-items:center; gap:10px; padding:8px 4px 8px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .tv input { width:150px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#6b5a50; flex:none; }
+  .dot.on { background:var(--ok); box-shadow:0 0 8px var(--ok); }
+  .dot.off { background:var(--bad); }
+  .seta { background:transparent; border:1px solid var(--line); color:var(--mut); border-radius:6px; width:28px; height:28px; padding:0; }
+  .seta:disabled { opacity:.25; }
+  .login { max-width:380px; margin:12vh auto; }
+  .login h1 { color:var(--gold); text-align:center; }
+  .erro { color:#e08a85; font-size:14px; min-height:20px; }
+  .vazio { color:var(--mut); text-align:center; padding:30px 0; }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--gold); color:#2a1618; padding:11px 20px; border-radius:10px; font-weight:600; display:none; z-index:20; max-width:90%; }
+  #toast.erro-t { background:#e08a85; }
+  .url { font-size:12px; color:var(--mut); font-family:ui-monospace,monospace; }
+  .prog { color:var(--gold); font-size:14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var CFG = window.CONFIG;
+  var sb = window.supabase.createClient(CFG.URL, CFG.KEY);
+  var app = document.getElementById('app');
+  var S = { salas: [], tvs: [], campanhas: [], atrib: [], status: [] };
+  var aba = 'campanhas';
+  var ocupado = false;
+  var MAX_MB = 50;
+
+  // ---------- utilidades ----------
+  function h(tag, attrs) {
+    var e = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      var v = attrs[k];
+      if (v === false || v == null) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k === 'value') e.value = v;
+      else if (k === 'checked') e.checked = !!v;
+      else if (k === 'disabled') e.disabled = !!v;
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? '' : v);
+    }
+    for (var i = 2; i < arguments.length; i++) add(e, arguments[i]);
+    return e;
+  }
+  function add(e, c) {
+    if (c == null || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { add(e, x); }); return; }
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  var toastT;
+  function toast(msg, erro) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.className = erro ? 'erro-t' : ''; t.style.display = 'block';
+    clearTimeout(toastT); toastT = setTimeout(function () { t.style.display = 'none'; }, erro ? 6000 : 2500);
+  }
+  function acao(fn) {
+    return function (ev) {
+      Promise.resolve().then(function () { return fn(ev); }).catch(function (e) {
+        console.error(e); toast((e && e.message) || 'Erro', true);
+      });
+    };
+  }
+  function slug(s) {
+    return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'x';
+  }
+  function nomeSeguro(s) {
+    return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_');
+  }
+  function rid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function chk(r) { if (r.error) throw new Error(r.error.message); return r.data; }
+  function pubUrl(path) { return sb.storage.from(CFG.BUCKET).getPublicUrl(path).data.publicUrl; }
+  function tvsDaSala(sid) { return S.tvs.filter(function (t) { return t.sala_id === sid; }).sort(function (a, b) { return a.ordem - b.ordem; }); }
+  function atribuida(tv, camp) { return S.atrib.some(function (a) { return a.tv_id === tv && a.campanha_id === camp; }); }
+  function statusDe(tv) { return S.status.filter(function (s) { return s.tv_id === tv; })[0]; }
+  function online(st) { return st && (Date.now() - new Date(st.visto).getTime()) < 5 * 60 * 1000; }
+  function baseTv() { return location.href.replace(/[#?].*$/, '').replace(/[^\/]*$/, '') + 'tv.html?tv='; }
+
+  async function carregar() {
+    var r = await Promise.all([
+      sb.from('salas').select('*').order('ordem'),
+      sb.from('tvs').select('*').order('ordem'),
+      sb.from('campanhas').select('*').order('criado_em', { ascending: false }),
+      sb.from('atribuicoes').select('*'),
+      sb.from('status').select('*')
+    ]);
+    S.salas = chk(r[0]); S.tvs = chk(r[1]); S.campanhas = chk(r[2]); S.atrib = chk(r[3]); S.status = chk(r[4]);
+  }
+  async function recarregar() { await carregar(); render(); }
+
+  // ---------- login ----------
+  function telaLogin(msg) {
+    app.innerHTML = '';
+    var em = h('input', { type: 'email', placeholder: 'E-mail', autocomplete: 'username' });
+    var se = h('input', { type: 'password', placeholder: 'Senha', autocomplete: 'current-password' });
+    var er = h('div', { class: 'erro' }, msg || '');
+    function entrar() {
+      er.textContent = '';
+      sb.auth.signInWithPassword({ email: em.value.trim(), password: se.value }).then(function (r) {
+        if (r.error) { er.textContent = 'E-mail ou senha incorretos.'; return; }
+        iniciar();
+      });
+    }
+    se.addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+    app.appendChild(h('div', { class: 'card login' },
+      h('h1', null, 'Painel de TVs'),
+      h('div', { class: 'mini', style: 'text-align:center;margin-bottom:16px' }, 'Coco Bambu'),
+      h('div', { style: 'margin-bottom:10px' }, em), h('div', { style: 'margin-bottom:10px' }, se),
+      er, h('button', { class: 'btn', style: 'width:100%', onclick: entrar }, 'Entrar')));
+  }
+
+  // ---------- estrutura ----------
+  function render() {
+    var y = window.scrollY;
+    app.innerHTML = '';
+    var tot = S.tvs.length, on = S.tvs.filter(function (t) { return online(statusDe(t.id)); }).length;
+    app.appendChild(h('header', null,
+      h('h1', null, 'Painel de TVs'),
+      h('nav', null,
+        h('button', { class: aba === 'campanhas' ? 'on' : '', onclick: function () { aba = 'campanhas'; render(); } }, 'Campanhas'),
+        h('button', { class: aba === 'tvs' ? 'on' : '', onclick: function () { aba = 'tvs'; render(); } }, 'Salões e TVs')),
+      h('div', { class: 'sp' }),
+      h('span', { class: 'mini' }, on + ' de ' + tot + ' TVs online'),
+      h('button', { class: 'btn sec peq', onclick: acao(recarregar) }, 'Atualizar'),
+      h('button', { class: 'btn sec peq', onclick: function () { sb.auth.signOut().then(function () { telaLogin(); }); } }, 'Sair')));
+    var main = h('main');
+    app.appendChild(main);
+    if (aba === 'campanhas') viewCampanhas(main); else viewTvs(main);
+    window.scrollTo(0, y);
+  }
+
+  // ---------- campanhas ----------
+  function lerDuracao(file) {
+    return new Promise(function (res) {
+      var v = document.createElement('video'), u = URL.createObjectURL(file);
+      v.preload = 'metadata';
+      v.onloadedmetadata = function () { var d = Math.max(1, Math.round(v.duration || 10)); URL.revokeObjectURL(u); res(d); };
+      v.onerror = function () { URL.revokeObjectURL(u); res(10); };
+      v.src = u;
+    });
+  }
+  async function enviar(files, campId, status) {
+    var itens = [];
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var tipo = f.type.indexOf('video') === 0 ? 'video' : (f.type.indexOf('image') === 0 ? 'imagem' : null);
+      if (!tipo) throw new Error('"' + f.name + '" não é vídeo nem imagem.');
+      if (f.size > MAX_MB * 1024 * 1024) throw new Error('"' + f.name + '" tem ' + Math.round(f.size / 1048576) + ' MB. O limite é ' + MAX_MB + ' MB: comprima o vídeo antes (HandBrake).');
+      status('Enviando ' + (i + 1) + ' de ' + files.length + ': ' + f.name + '...');
+      var dur = tipo === 'video' ? await lerDuracao(f) : 10;
+      var path = campId + '/' + Date.now() + '-' + i + '-' + nomeSeguro(f.name);
+      var up = await sb.storage.from(CFG.BUCKET).upload(path, f, { contentType: f.type, upsert: false });
+      if (up.error) throw new Error('Falha ao enviar "' + f.name + '": ' + up.error.message);
+      itens.push({ path: path, tipo: tipo, nome: f.name, dur: dur });
+    }
+    return itens;
+  }
+
+  function viewCampanhas(main) {
+    var nome = h('input', { type: 'text', placeholder: 'Nome da campanha (ex.: Dia das Mães)' });
+    var arq = h('input', { type: 'file', multiple: true, accept: 'video/*,image/*', style: 'margin-top:10px;color:var(--mut)' });
+    var prog = h('div', { class: 'prog', style: 'margin-top:8px' });
+    var btn = h('button', { class: 'btn gold', style: 'margin-top:10px' }, 'Criar campanha');
+    btn.addEventListener('click', acao(async function () {
+      if (ocupado) return;
+      if (!nome.value.trim()) throw new Error('Dê um nome para a campanha.');
+      if (!arq.files.length) throw new Error('Escolha pelo menos um vídeo ou imagem.');
+      ocupado = true; btn.disabled = true;
+      try {
+        var id = 'c' + rid();
+        var itens = await enviar(arq.files, id, function (t) { prog.textContent = t; });
+        chk(await sb.from('campanhas').insert({ id: id, nome: nome.value.trim(), ativa: true, itens: itens }));
+        toast('Campanha criada. Agora escolha onde ela passa.');
+        ocupado = false;
+        await recarregar();
+      } finally { ocupado = false; btn.disabled = false; prog.textContent = ''; }
+    }));
+    main.appendChild(h('div', { class: 'card' },
+      h('h2', null, 'Nova campanha'), nome, arq,
+      h('div', { class: 'mini', style: 'margin-top:6px' }, 'Vídeos até ' + MAX_MB + ' MB, de preferência já comprimidos (1920x1080, sem áudio). Imagens passam 10 s por padrão.'),
+      btn, prog));
+
+    if (!S.campanhas.length) main.appendChild(h('div', { class: 'vazio' }, 'Nenhuma campanha ainda.'));
+    S.campanhas.forEach(function (c) { main.appendChild(cardCampanha(c)); });
+  }
+
+  function salvarItens(c, itens) {
+    return sb.from('campanhas').update({ itens: itens }).eq('id', c.id).then(chk).then(recarregar);
+  }
+
+  function cardCampanha(c) {
+    var itens = c.itens || [];
+    var nomeIn = h('input', { type: 'text', class: 'nome-camp', value: c.nome });
+    nomeIn.addEventListener('change', acao(function () {
+      var v = nomeIn.value.trim(); if (!v) { nomeIn.value = c.nome; return; }
+      return sb.from('campanhas').update({ nome: v }).eq('id', c.id).then(chk).then(recarregar);
+    }));
+    var ativaBtn = h('button', { class: 'chip ' + (c.ativa ? 'on' : ''), onclick: acao(function () {
+      return sb.from('campanhas').update({ ativa: !c.ativa }).eq('id', c.id).then(chk).then(recarregar);
+    }) }, c.ativa ? 'Ativa' : 'Pausada');
+    var del = h('button', { class: 'btn perigo peq', onclick: acao(async function () {
+      if (!confirm('Excluir a campanha "' + c.nome + '" e seus arquivos? Isso não pode ser desfeito.')) return;
+      var paths = itens.map(function (i) { return i.path; });
+      if (paths.length) await sb.storage.from(CFG.BUCKET).remove(paths);
+      chk(await sb.from('campanhas').delete().eq('id', c.id));
+      toast('Campanha excluída.');
+      await recarregar();
+    }) }, 'Excluir');
+
+    var lista = itens.map(function (it, idx) {
+      var url = pubUrl(it.path);
+      var th = it.tipo === 'video' ? h('video', { class: 'th', src: url + '#t=0.5', preload: 'metadata', muted: true }) : h('img', { class: 'th', src: url });
+      var dur = h('input', { type: 'number', class: 'dur', min: 1, max: 600, value: it.dur || 10, disabled: it.tipo === 'video' });
+      dur.addEventListener('change', acao(function () {
+        var n = Math.max(1, Math.min(600, parseInt(dur.value, 10) || 10));
+        var novo = itens.slice(); novo[idx] = Object.assign({}, it, { dur: n });
+        return salvarItens(c, novo);
+      }));
+      return h('div', { class: 'item' }, th,
+        h('div', { class: 'nm', title: it.nome }, it.nome),
+        h('span', { class: 'mini' }, it.tipo === 'video' ? it.dur + ' s' : 'segundos:'),
+        it.tipo === 'video' ? null : dur,
+        h('button', { class: 'btn perigo peq', onclick: acao(async function () {
+          if (itens.length === 1) throw new Error('A campanha precisa de pelo menos um arquivo. Para tirar tudo, exclua a campanha.');
+          if (!confirm('Remover "' + it.nome + '" desta campanha?')) return;
+          await sb.storage.from(CFG.BUCKET).remove([it.path]);
+          await salvarItens(c, itens.filter(function (_, j) { return j !== idx; }));
+        }) }, 'Remover'));
+    });
+
+    var add = h('input', { type: 'file', multiple: true, accept: 'video/*,image/*', style: 'display:none' });
+    var addMsg = h('span', { class: 'prog' });
+    add.addEventListener('change', acao(async function () {
+      if (!add.files.length || ocupado) return;
+      ocupado = true;
+      try {
+        var novos = await enviar(add.files, c.id, function (t) { addMsg.textContent = t; });
+        await salvarItens(c, itens.concat(novos));
+      } finally { ocupado = false; addMsg.textContent = ''; }
+    }));
+
+    // onde passa
+    var onde = h('div', { class: 'onde' }, h('div', { class: 'mini', style: 'margin-bottom:8px' }, 'Onde passa'));
+    S.salas.slice().sort(function (a, b) { return a.ordem - b.ordem; }).forEach(function (s) {
+      var tvs = tvsDaSala(s.id);
+      if (!tvs.length) return;
+      var n = tvs.filter(function (t) { return atribuida(t.id, c.id); }).length;
+      var cls = n === tvs.length ? 'on' : (n ? 'parcial' : '');
+      var linha = h('div', { class: 'sala' }, h('b', null, s.nome),
+        h('button', { class: 'chip todo ' + cls, onclick: acao(function () { return marcar(c, tvs, n !== tvs.length); }) }, 'Salão todo'));
+      tvs.forEach(function (t) {
+        linha.appendChild(h('button', { class: 'chip ' + (atribuida(t.id, c.id) ? 'on' : ''), onclick: acao(function () { return marcar(c, [t], !atribuida(t.id, c.id)); }) }, t.nome));
+      });
+      onde.appendChild(linha);
+    });
+    onde.appendChild(h('div', { class: 'linha' },
+      h('button', { class: 'btn sec peq', onclick: acao(function () { return marcar(c, S.tvs, true); }) }, 'Todas as TVs'),
+      h('button', { class: 'btn sec peq', onclick: acao(function () { return marcar(c, S.tvs, false); }) }, 'Nenhuma')));
+    var algum = S.atrib.some(function (a) { return a.campanha_id === c.id; });
+    if (!algum) onde.appendChild(h('div', { class: 'mini', style: 'margin-top:8px;color:var(--gold)' }, 'Esta campanha ainda não passa em nenhuma TV.'));
+
+    return h('div', { class: 'card' },
+      h('div', { class: 'linha', style: 'margin-bottom:10px' }, h('div', { style: 'flex:1;min-width:200px' }, nomeIn), ativaBtn, del),
+      lista,
+      h('div', { class: 'linha', style: 'margin-top:6px' },
+        h('button', { class: 'btn sec peq', onclick: function () { add.click(); } }, '+ Adicionar arquivos'), add, addMsg),
+      onde);
+  }
+
+  async function marcar(c, tvs, ligar) {
+    if (ligar) {
+      var linhas = [];
+      tvs.forEach(function (t) {
+        if (atribuida(t.id, c.id)) return;
+        var max = S.atrib.filter(function (a) { return a.tv_id === t.id; }).reduce(function (m, a) { return Math.max(m, a.ordem); }, 0);
+        linhas.push({ tv_id: t.id, campanha_id: c.id, ordem: max + 1 });
+      });
+      if (linhas.length) chk(await sb.from('atribuicoes').insert(linhas));
+    } else {
+      var ids = tvs.map(function (t) { return t.id; });
+      chk(await sb.from('atribuicoes').delete().eq('campanha_id', c.id).in('tv_id', ids));
+    }
+    await recarregar();
+  }
+
+  // ---------- salões e TVs ----------
+  function trocar(tabela, a, b) {
+    return Promise.all([
+      sb.from(tabela).update({ ordem: b.ordem }).eq('id', a.id),
+      sb.from(tabela).update({ ordem: a.ordem }).eq('id', b.id)
+    ]).then(function (r) { r.forEach(chk); return recarregar(); });
+  }
+
+  function viewTvs(main) {
+    var salas = S.salas.slice().sort(function (a, b) { return a.ordem - b.ordem; });
+    salas.forEach(function (s, si) {
+      var tvs = tvsDaSala(s.id);
+      var nomeIn = h('input', { type: 'text', value: s.nome });
+      nomeIn.addEventListener('change', acao(function () {
+        var v = nomeIn.value.trim(); if (!v) { nomeIn.value = s.nome; return; }
+        return sb.from('salas').update({ nome: v }).eq('id', s.id).then(chk).then(recarregar);
+      }));
+      var cab = h('div', { class: 'sala-cab' },
+        h('button', { class: 'seta', disabled: si === 0, title: 'Subir', onclick: acao(function () { return trocar('salas', s, salas[si - 1]); }) }, '↑'),
+        h('button', { class: 'seta', disabled: si === salas.length - 1, title: 'Descer', onclick: acao(function () { return trocar('salas', s, salas[si + 1]); }) }, '↓'),
+        h('div', { style: 'flex:1' }, nomeIn),
+        h('span', { class: 'mini' }, tvs.length + (tvs.length === 1 ? ' TV' : ' TVs')),
+        h('button', { class: 'btn perigo peq', onclick: acao(async function () {
+          if (!confirm('Remover o salão "' + s.nome + '" e suas ' + tvs.length + ' TV(s)?')) return;
+          chk(await sb.from('salas').delete().eq('id', s.id));
+          await recarregar();
+        }) }, 'Remover salão'));
+      var card = h('div', { class: 'card', style: 'padding:12px' }, cab);
+      tvs.forEach(function (t, ti) {
+        var st = statusDe(t.id), on = online(st);
+        var tn = h('input', { type: 'text', value: t.nome });
+        tn.addEventListener('change', acao(function () {
+          var v = tn.value.trim(); if (!v) { tn.value = t.nome; return; }
+          return sb.from('tvs').update({ nome: v }).eq('id', t.id).then(chk).then(recarregar);
+        }));
+        var texto = on ? ('online' + (st.tocando ? ' · ' + st.tocando : '')) : (st ? 'offline desde ' + new Date(st.visto).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca conectou');
+        var link = baseTv() + t.id;
+        card.appendChild(h('div', { class: 'tv' },
+          h('button', { class: 'seta', disabled: ti === 0, onclick: acao(function () { return trocar('tvs', t, tvs[ti - 1]); }) }, '↑'),
+          h('button', { class: 'seta', disabled: ti === tvs.length - 1, onclick: acao(function () { return trocar('tvs', t, tvs[ti + 1]); }) }, '↓'),
+          tn,
+          h('span', { class: 'dot ' + (on ? 'on' : (st ? 'off' : '')) }),
+          h('span', { class: 'mini', style: 'min-width:150px' }, texto),
+          h('span', { class: 'sp' }),
+          h('span', { class: 'url' }, 'tv.html?tv=' + t.id),
+          h('button', { class: 'btn sec peq', onclick: function () { window.open(link, '_blank'); } }, 'Ver'),
+          h('button', { class: 'btn sec peq', onclick: function () { (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { toast('Link copiado.'); }, function () { prompt('Copie o link:', link); }); } }, 'Copiar link'),
+          h('button', { class: 'btn perigo peq', onclick: acao(async function () {
+            if (!confirm('Remover "' + t.nome + '" de ' + s.nome + '?')) return;
+            chk(await sb.from('tvs').delete().eq('id', t.id));
+            await recarregar();
+          }) }, 'Remover')));
+      });
+      card.appendChild(h('div', { style: 'margin-top:10px' },
+        h('button', { class: 'btn sec peq', onclick: acao(async function () {
+          var usados = tvs.map(function (t) { return t.id; });
+          var letra = 'a', k = 0;
+          while (usados.indexOf(s.id + '-' + String.fromCharCode(97 + k)) >= 0 && k < 25) k++;
+          letra = String.fromCharCode(97 + k);
+          var ordem = tvs.reduce(function (m, t) { return Math.max(m, t.ordem); }, 0) + 1;
+          chk(await sb.from('tvs').insert({ id: s.id + '-' + letra, sala_id: s.id, nome: 'TV ' + letra.toUpperCase(), ordem: ordem }));
+          await recarregar();
+        }) }, '+ Adicionar TV')));
+      main.appendChild(card);
+    });
+
+    var novo = h('input', { type: 'text', placeholder: 'Nome do novo salão' });
+    main.appendChild(h('div', { class: 'card' }, h('h2', null, 'Novo salão'),
+      h('div', { class: 'linha' }, h('div', { style: 'flex:1;min-width:200px' }, novo),
+        h('button', { class: 'btn', onclick: acao(async function () {
+          var n = novo.value.trim(); if (!n) throw new Error('Digite o nome do salão.');
+          var id = slug(n); if (S.salas.some(function (s) { return s.id === id; })) id += '-' + rid().slice(-3);
+          var ordem = S.salas.reduce(function (m, s) { return Math.max(m, s.ordem); }, 0) + 1;
+          chk(await sb.from('salas').insert({ id: id, nome: n, ordem: ordem }));
+          chk(await sb.from('tvs').insert({ id: id + '-a', sala_id: id, nome: 'TV A', ordem: 1 }));
+          await recarregar();
+        }) }, 'Criar salão'))));
+  }
+
+  // ---------- início ----------
+  async function iniciar() {
+    try {
+      await carregar();
+      render();
+      setInterval(function () { if (aba === 'tvs' && !ocupado && document.activeElement && document.activeElement.tagName !== 'INPUT') { carregar().then(render).catch(function () {}); } }, 60000);
+    } catch (e) {
+      console.error(e); telaLogin('Erro ao carregar: ' + e.message);
+    }
+  }
+  sb.auth.getSession().then(function (r) {
+    if (r.data && r.data.session) iniciar(); else telaLogin();
+  });
+})();
+</script>
+</body>
+</html>
