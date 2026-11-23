@@ -67,8 +67,13 @@
     x.send(JSON.stringify(corpo));
   }
 
+  window.onerror = function (msg) {
+    try { if (!document.querySelector('.camada.on')) mostrarAviso('Erro no player', String(msg)); } catch (e) {}
+  };
+
   // ---------- cache: cada arquivo é baixado uma única vez ----------
-  var VERSAO = 'tv-2 cache';
+  var VERSAO = 'tv-3 cache';
+  var SEM_CACHE = /[?&]nocache=1/.test(location.search);
   var est = { baixados: 0, doCache: 0, memoria: 0, via: 'nenhum', bytes: 0 };
   var memoria = {};     // path -> endereço local (blob)
   var pendentes = {};   // path -> funções esperando o download
@@ -76,33 +81,46 @@
     if (memoria[path]) { est.memoria++; cb(memoria[path]); return; }
     if (pendentes[path]) { pendentes[path].push(cb); return; }
     pendentes[path] = [cb];
-    var u = url(path);
+    var u = url(path), feito = false, xhrIniciado = false, tCache = null;
     function fim(src) {
+      if (feito) return; feito = true;
+      if (tCache) clearTimeout(tCache);
       var fila = pendentes[path] || []; delete pendentes[path];
       for (var i = 0; i < fila.length; i++) fila[i](src);
     }
-    function guardar(blob) { est.bytes += blob.size || 0; memoria[path] = URL.createObjectURL(blob); fim(memoria[path]); }
+    function guardar(blob) {
+      if (feito) return;
+      est.bytes += blob.size || 0;
+      memoria[path] = URL.createObjectURL(blob);
+      fim(memoria[path]);
+    }
     function viaXhr() {
+      if (xhrIniciado || feito) return; xhrIniciado = true;
       try {
         var x = new XMLHttpRequest();
-        x.open('GET', u, true); x.responseType = 'blob';
-        x.onload = function () { if (x.status >= 200 && x.status < 300 && x.response) { est.via = 'xhr'; est.baixados++; guardar(x.response); } else fim(u); };
-        x.onerror = function () { fim(u); };
+        x.open('GET', u, true); x.responseType = 'blob'; x.timeout = 60000;
+        x.onload = function () { if (x.status >= 200 && x.status < 300 && x.response) { est.via = 'xhr'; est.baixados++; guardar(x.response); } else { est.via = 'direto'; fim(u); } };
+        x.onerror = function () { est.via = 'direto'; fim(u); };
+        x.ontimeout = function () { est.via = 'direto'; fim(u); };
         x.send();
-      } catch (e) { fim(u); }
+      } catch (e) { est.via = 'direto'; fim(u); }
     }
+    if (SEM_CACHE) { est.via = 'direto'; fim(u); return; }
     if (window.caches && window.fetch && window.Promise) {
-      caches.open('midia-v1').then(function (c) {
-        est.via = 'cache-api';
-        return c.match(u).then(function (r) {
-          if (r) { est.doCache++; return r; }
-          return fetch(u).then(function (resp) {
-            if (!resp.ok) throw new Error('http');
-            est.baixados++;
-            return c.put(u, resp.clone()).then(function () { return resp; });
+      tCache = setTimeout(viaXhr, 12000);   // se o cache da TV travar, segue por outro caminho
+      try {
+        caches.open('midia-v1').then(function (c) {
+          est.via = 'cache-api';
+          return c.match(u).then(function (r) {
+            if (r) { est.doCache++; return r; }
+            return fetch(u).then(function (resp) {
+              if (!resp.ok) throw new Error('http');
+              est.baixados++;
+              return c.put(u, resp.clone()).then(function () { return resp; });
+            });
           });
-        });
-      }).then(function (resp) { return resp.blob(); }).then(guardar).catch(viaXhr);
+        }).then(function (resp) { return resp.blob(); }).then(guardar)['catch'](viaXhr);
+      } catch (e) { viaXhr(); }
     } else viaXhr();
   }
   function limpar() {
