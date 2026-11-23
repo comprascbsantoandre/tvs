@@ -72,8 +72,12 @@
   };
 
   // ---------- cache: cada arquivo é baixado uma única vez ----------
-  var VERSAO = 'tv-3 cache';
-  var SEM_CACHE = /[?&]nocache=1/.test(location.search);
+  var VERSAO = 'tv-5 samsung';
+  var SEM_CACHE = /[?&](amp;)?nocache=1/.test(location.search);
+  var SEM_BLOB_VIDEO = false;
+  try { SEM_BLOB_VIDEO = localStorage.getItem('semBlobVideo') === '1'; } catch (e) {}
+  if (/Tizen|SMART-TV|SamsungBrowser/i.test(navigator.userAgent)) SEM_BLOB_VIDEO = true;
+  var ultimoVideo = null;
   var est = { baixados: 0, doCache: 0, memoria: 0, via: 'nenhum', bytes: 0 };
   var memoria = {};     // path -> endereço local (blob)
   var pendentes = {};   // path -> funções esperando o download
@@ -141,7 +145,7 @@
   }
   function baixarTudo() {
     var fila = [], i;
-    for (i = 0; i < lista.length; i++) fila.push(lista[i].path);
+    for (i = 0; i < lista.length; i++) { if (!(SEM_BLOB_VIDEO && lista[i].tipo === 'video')) fila.push(lista[i].path); }
     (function prox() { if (!fila.length) return; obter(fila.shift(), prox); })();
   }
 
@@ -184,7 +188,7 @@
       frente = atras;
       setTimeout(function () { if (antiga !== camadas[frente]) antiga.innerHTML = ''; }, 1000);
       tocandoAgora = item.campanha || '';
-      if (lista.length > 1) obter(lista[(i + 1) % lista.length].path, function () {});
+      if (lista.length > 1 && !(SEM_BLOB_VIDEO && lista[(i + 1) % lista.length].tipo === 'video')) obter(lista[(i + 1) % lista.length].path, function () {});
       var dur = parseInt(item.dur, 10) || 10;
       if (item.tipo === 'video') {
         try { var p = el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
@@ -214,7 +218,30 @@
       el.onended = avancar;
       el.onerror = falhou;
       cam.appendChild(el);
-      obter(item.path, function (src) { if (meu !== geracao) return; el.src = src; try { el.load(); } catch (e) {} });
+      ultimoVideo = el;
+      function usarDireto() {
+        SEM_BLOB_VIDEO = true;
+        try { localStorage.setItem('semBlobVideo', '1'); } catch (e) {}
+        el.src = url(item.path);
+        try { el.load(); } catch (e) {}
+      }
+      if (SEM_BLOB_VIDEO) {
+        el.src = url(item.path);
+        try { el.load(); } catch (e) {}
+      } else {
+        obter(item.path, function (src) {
+          if (meu !== geracao) return;
+          el.src = src;
+          try { el.load(); } catch (e) {}
+          if (src.indexOf('blob:') === 0) {
+            // se a TV não toca vídeo vindo da memória, volta para o modo direto
+            setTimeout(function () {
+              if (meu !== geracao) return;
+              if (!pronto || (el.currentTime === 0 && el.src.indexOf('blob:') === 0)) usarDireto();
+            }, 8000);
+          }
+        });
+      }
       setTimeout(function () { if (!pronto && meu === geracao) { exibir(); } }, 15000);
     } else {
       el = document.createElement('img');
@@ -283,7 +310,9 @@
       dbg.innerHTML = VERSAO + '<br>Cache API: ' + (window.caches ? 'sim' : 'NAO') + ' (' + est.via + ')' +
         '<br>Baixados da internet: ' + est.baixados + ' (' + (est.bytes / 1048576).toFixed(1) + ' MB)' +
         '<br>Vindos do cache: ' + est.doCache + ' | da memoria: ' + est.memoria +
-        '<br>Arquivos na lista: ' + lista.length;
+        '<br>Arquivos na lista: ' + lista.length +
+        '<br>Video direto (sem blob): ' + (SEM_BLOB_VIDEO ? 'SIM' : 'nao') +
+        (ultimoVideo ? '<br>video: pronto=' + ultimoVideo.readyState + ' erro=' + (ultimoVideo.error ? ultimoVideo.error.code : '-') + ' tempo=' + Math.round(ultimoVideo.currentTime) + 's ' + (String(ultimoVideo.src).indexOf('blob:') === 0 ? 'blob' : 'url') : '');
     }, 1000);
   }
 
