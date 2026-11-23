@@ -67,6 +67,62 @@
     x.send(JSON.stringify(corpo));
   }
 
+  // ---------- cache: cada arquivo é baixado uma única vez ----------
+  var memoria = {};     // path -> endereço local (blob)
+  var pendentes = {};   // path -> funções esperando o download
+  function obter(path, cb) {
+    if (memoria[path]) { cb(memoria[path]); return; }
+    if (pendentes[path]) { pendentes[path].push(cb); return; }
+    pendentes[path] = [cb];
+    var u = url(path);
+    function fim(src) {
+      var fila = pendentes[path] || []; delete pendentes[path];
+      for (var i = 0; i < fila.length; i++) fila[i](src);
+    }
+    function guardar(blob) { memoria[path] = URL.createObjectURL(blob); fim(memoria[path]); }
+    function viaXhr() {
+      try {
+        var x = new XMLHttpRequest();
+        x.open('GET', u, true); x.responseType = 'blob';
+        x.onload = function () { if (x.status >= 200 && x.status < 300 && x.response) guardar(x.response); else fim(u); };
+        x.onerror = function () { fim(u); };
+        x.send();
+      } catch (e) { fim(u); }
+    }
+    if (window.caches && window.fetch && window.Promise) {
+      caches.open('midia-v1').then(function (c) {
+        return c.match(u).then(function (r) {
+          if (r) return r;
+          return fetch(u).then(function (resp) {
+            if (!resp.ok) throw new Error('http');
+            return c.put(u, resp.clone()).then(function () { return resp; });
+          });
+        });
+      }).then(function (resp) { return resp.blob(); }).then(guardar).catch(viaXhr);
+    } else viaXhr();
+  }
+  function limpar() {
+    var validos = {}, i;
+    for (i = 0; i < lista.length; i++) validos[lista[i].path] = 1;
+    for (var k in memoria) { if (!validos[k]) { try { URL.revokeObjectURL(memoria[k]); } catch (e) {} delete memoria[k]; } }
+    if (window.caches && window.Promise) {
+      caches.open('midia-v1').then(function (c) {
+        return c.keys().then(function (ks) {
+          ks.forEach(function (r) {
+            var manter = false;
+            for (var p in validos) { if (r.url === url(p)) manter = true; }
+            if (!manter) c['delete'](r);
+          });
+        });
+      })['catch'](function () {});
+    }
+  }
+  function baixarTudo() {
+    var fila = [], i;
+    for (i = 0; i < lista.length; i++) fila.push(lista[i].path);
+    (function prox() { if (!fila.length) return; obter(fila.shift(), prox); })();
+  }
+
   // ---------- reprodução ----------
   function limpaTimer() { if (timer) { clearTimeout(timer); timer = null; } }
 
@@ -106,6 +162,7 @@
       frente = atras;
       setTimeout(function () { if (antiga !== camadas[frente]) antiga.innerHTML = ''; }, 1000);
       tocandoAgora = item.campanha || '';
+      if (lista.length > 1) obter(lista[(i + 1) % lista.length].path, function () {});
       var dur = parseInt(item.dur, 10) || 10;
       if (item.tipo === 'video') {
         try { var p = el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
@@ -134,16 +191,15 @@
       el.oncanplay = exibir;
       el.onended = avancar;
       el.onerror = falhou;
-      el.src = url(item.path);
       cam.appendChild(el);
-      try { el.load(); } catch (e) {}
+      obter(item.path, function (src) { if (meu !== geracao) return; el.src = src; try { el.load(); } catch (e) {} });
       setTimeout(function () { if (!pronto && meu === geracao) { exibir(); } }, 15000);
     } else {
       el = document.createElement('img');
       el.onload = exibir;
       el.onerror = falhou;
-      el.src = url(item.path);
       cam.appendChild(el);
+      obter(item.path, function (src) { if (meu !== geracao) return; el.src = src; });
       setTimeout(function () { if (!pronto && meu === geracao) { falhou(); } }, 15000);
     }
   }
@@ -156,6 +212,8 @@
     try { localStorage.setItem('pl-' + tvId, ass); } catch (e) {}
     lista = nova;
     pos = -1;
+    limpar();
+    baixarTudo();
     if (!lista.length) { mostrarVazio(); return; }
     proximo();
   }
