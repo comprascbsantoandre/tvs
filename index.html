@@ -265,7 +265,7 @@
       status(rotulo + ' — enviando' + (f !== original ? ' (' + Math.round(original.size / 1048576) + ' MB → ' + (f.size / 1048576).toFixed(1) + ' MB)' : '') + '...');
       var dur = tipo === 'video' ? await lerDuracao(f) : 10;
       var path = campId + '/' + Date.now() + '-' + i + '-' + nomeSeguro(f.name);
-      var up = await sb.storage.from(CFG.BUCKET).upload(path, f, { contentType: f.type, upsert: false });
+      var up = await sb.storage.from(CFG.BUCKET).upload(path, f, { contentType: f.type, upsert: false, cacheControl: '31536000' });
       if (up.error) throw new Error('Falha ao enviar "' + f.name + '": ' + up.error.message);
       itens.push({ path: path, tipo: tipo, nome: f.name, dur: dur });
     }
@@ -325,7 +325,7 @@
 
     var lista = itens.map(function (it, idx) {
       var url = pubUrl(it.path);
-      var th = it.tipo === 'video' ? h('video', { class: 'th', src: url + '#t=0.5', preload: 'metadata', muted: true }) : h('img', { class: 'th', src: url });
+      var th = it.tipo === 'video' ? h('div', { class: 'th', style: 'display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:22px' }, '▶') : h('img', { class: 'th', src: url, loading: 'lazy' });
       var dur = h('input', { type: 'number', class: 'dur', min: 1, max: 600, value: it.dur || 10, disabled: it.tipo === 'video' });
       dur.addEventListener('change', acao(function () {
         var n = Math.max(1, Math.min(600, parseInt(dur.value, 10) || 10));

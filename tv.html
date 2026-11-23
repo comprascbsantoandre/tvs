@@ -68,10 +68,12 @@
   }
 
   // ---------- cache: cada arquivo é baixado uma única vez ----------
+  var VERSAO = 'tv-2 cache';
+  var est = { baixados: 0, doCache: 0, memoria: 0, via: 'nenhum', bytes: 0 };
   var memoria = {};     // path -> endereço local (blob)
   var pendentes = {};   // path -> funções esperando o download
   function obter(path, cb) {
-    if (memoria[path]) { cb(memoria[path]); return; }
+    if (memoria[path]) { est.memoria++; cb(memoria[path]); return; }
     if (pendentes[path]) { pendentes[path].push(cb); return; }
     pendentes[path] = [cb];
     var u = url(path);
@@ -79,22 +81,24 @@
       var fila = pendentes[path] || []; delete pendentes[path];
       for (var i = 0; i < fila.length; i++) fila[i](src);
     }
-    function guardar(blob) { memoria[path] = URL.createObjectURL(blob); fim(memoria[path]); }
+    function guardar(blob) { est.bytes += blob.size || 0; memoria[path] = URL.createObjectURL(blob); fim(memoria[path]); }
     function viaXhr() {
       try {
         var x = new XMLHttpRequest();
         x.open('GET', u, true); x.responseType = 'blob';
-        x.onload = function () { if (x.status >= 200 && x.status < 300 && x.response) guardar(x.response); else fim(u); };
+        x.onload = function () { if (x.status >= 200 && x.status < 300 && x.response) { est.via = 'xhr'; est.baixados++; guardar(x.response); } else fim(u); };
         x.onerror = function () { fim(u); };
         x.send();
       } catch (e) { fim(u); }
     }
     if (window.caches && window.fetch && window.Promise) {
       caches.open('midia-v1').then(function (c) {
+        est.via = 'cache-api';
         return c.match(u).then(function (r) {
-          if (r) return r;
+          if (r) { est.doCache++; return r; }
           return fetch(u).then(function (resp) {
             if (!resp.ok) throw new Error('http');
+            est.baixados++;
             return c.put(u, resp.clone()).then(function () { return resp; });
           });
         });
@@ -251,6 +255,19 @@
   }
   document.addEventListener('click', telaCheia);
   document.addEventListener('keydown', telaCheia);
+
+  // ---------- diagnóstico: abra o link com &debug=1 ----------
+  if (/[?&]debug=1/.test(location.search)) {
+    var dbg = document.createElement('div');
+    dbg.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:99;background:rgba(0,0,0,.8);color:#d9a84e;font:20px Arial;padding:10px 14px;border-radius:8px;line-height:1.4';
+    document.body.appendChild(dbg);
+    setInterval(function () {
+      dbg.innerHTML = VERSAO + '<br>Cache API: ' + (window.caches ? 'sim' : 'NAO') + ' (' + est.via + ')' +
+        '<br>Baixados da internet: ' + est.baixados + ' (' + (est.bytes / 1048576).toFixed(1) + ' MB)' +
+        '<br>Vindos do cache: ' + est.doCache + ' | da memoria: ' + est.memoria +
+        '<br>Arquivos na lista: ' + lista.length;
+    }, 1000);
+  }
 
   // ---------- início ----------
   if (!tvId) {
