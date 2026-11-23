@@ -201,7 +201,7 @@
   // ---------- compressão no navegador ----------
   var ffPromise = null;
   var ffProgresso = null;
-  var LIMITE_COMPRIMIR = 12 * 1024 * 1024; // vídeos acima disso são comprimidos
+  var LIMITE_COMPRIMIR = 2 * 1024 * 1024; // vídeos acima disso são comprimidos (leve, para não pesar a internet)
   var CORE_BASE = CFG.CORE_BASE || 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
   function blobUrl(url, tipo) {
     return fetch(url).then(function (r) { if (!r.ok) throw new Error('Falha ao baixar ' + url); return r.blob(); })
@@ -232,8 +232,8 @@
     };
     status(rotulo + ' — comprimindo 0%');
     await ff.writeFile('in.mp4', new Uint8Array(await file.arrayBuffer()));
-    var rc = await ff.exec(['-i', 'in.mp4', '-vf', 'scale=min(1920\\,iw):-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25',
-      '-maxrate', '4M', '-bufsize', '8M', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', 'out.mp4']);
+    var rc = await ff.exec(['-i', 'in.mp4', '-vf', 'scale=min(1280\\,iw):-2,fps=30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '29',
+      '-maxrate', '1500k', '-bufsize', '3M', '-profile:v', 'main', '-level', '3.1', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', 'out.mp4']);
     ffProgresso = null;
     if (rc !== 0) { try { await ff.deleteFile('in.mp4'); } catch (e) {} throw new Error('Não foi possível comprimir este vídeo.'); }
     var dados = await ff.readFile('out.mp4');
